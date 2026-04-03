@@ -15,6 +15,10 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: 'Next-Gen Skillforge',
   description: 'AI-driven career profile analysis and learning roadmap',
+  icons: {
+    icon: '/next-gen-skillforge-logo.svg',
+    shortcut: '/next-gen-skillforge-logo.svg',
+  },
 };
 
 export default function RootLayout({
