@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   BookOpen,
   Briefcase,
@@ -9,7 +9,9 @@ import {
   Github,
   Lightbulb,
   Linkedin,
+  Moon,
   Sparkles,
+  Sun,
   UserCircle2,
 } from 'lucide-react';
 import {
@@ -42,9 +44,23 @@ const priorityClass = {
   low: 'bg-emerald-100 text-emerald-800 border-emerald-200',
 };
 
+type ThemeMode = 'light' | 'dark';
+type ThemeTransition = 'to-light' | 'to-dark' | 'dark-moon' | null;
+
+const navSections = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'links', label: 'Links' },
+  { id: 'skills', label: 'Skill Graphs' },
+  { id: 'jobs', label: 'Recommendations' },
+  { id: 'summary', label: 'AI Summary' },
+  { id: 'learning', label: 'Learning Path' },
+];
+
 export default function HomePage() {
   const [links, setLinks] = useState<SocialLinks>(mockUserProfile.links);
   const [expandedJobs, setExpandedJobs] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>('light');
+  const [themeTransition, setThemeTransition] = useState<ThemeTransition>(null);
 
   const jobsToShow = useMemo(
     () => mockUserProfile.jobRecommendations.slice(0, expandedJobs ? 5 : 3),
@@ -65,9 +81,134 @@ export default function HomePage() {
     setLinks((prev) => ({ ...prev, [field]: value }));
   };
 
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem('theme-mode');
+    if (savedTheme === 'dark' || savedTheme === 'light') {
+      setTheme(savedTheme);
+      return;
+    }
+
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setTheme('dark');
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem('theme-mode', theme);
+  }, [theme]);
+
+  const handleThemeToggle = () => {
+    if (theme === 'dark') {
+      setThemeTransition('to-light');
+      window.setTimeout(() => setTheme('light'), 260);
+      window.setTimeout(() => setThemeTransition(null), 900);
+      return;
+    }
+
+    setTheme('dark');
+    setThemeTransition('to-dark');
+    window.setTimeout(() => setThemeTransition('dark-moon'), 560);
+    window.setTimeout(() => setThemeTransition(null), 1080);
+  };
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-8 lg:gap-10 lg:py-12">
+    <>
+      <AnimatePresence>
+        {themeTransition === 'to-light' && (
+          <motion.div
+            key="sun-expand"
+            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.28 }}
+          >
+            <motion.div
+              className="absolute h-20 w-20 rounded-full bg-amber-200/35"
+              initial={{ scale: 0.2 }}
+              animate={{ scale: 25 }}
+              transition={{ duration: 0.72, ease: 'easeInOut' }}
+            />
+            <motion.div
+              className="rounded-full border border-amber-200/70 bg-amber-100/30 p-5"
+              initial={{ opacity: 0.65, scale: 0.4 }}
+              animate={{ opacity: 0.18, scale: 1.75 }}
+              transition={{ duration: 0.66, ease: 'easeOut' }}
+            >
+              <Sun className="h-12 w-12 text-amber-50" />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {themeTransition === 'to-dark' && (
+          <motion.div
+            key="light-shrink"
+            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div
+              className="h-[100vmax] w-[100vmax] rounded-full bg-amber-100/35"
+              initial={{ scale: 1.4 }}
+              animate={{ scale: 0 }}
+              transition={{ duration: 0.52, ease: 'easeInOut' }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {themeTransition === 'dark-moon' && (
+          <motion.div
+            key="moon-glow"
+            className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22 }}
+          >
+            <motion.div
+              className="rounded-full border border-indigo-200/60 bg-indigo-200/20 p-5"
+              initial={{ scale: 0.72, opacity: 0 }}
+              animate={{ scale: 1.18, opacity: 0.55 }}
+              exit={{ scale: 1.28, opacity: 0 }}
+              transition={{ duration: 0.42 }}
+            >
+              <Moon className="h-11 w-11 text-indigo-100" />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-4 py-4 sm:px-8 lg:gap-10 lg:py-8">
+        <nav className="glass-panel sticky top-3 z-40 flex items-center gap-3 overflow-x-auto rounded-2xl px-3 py-2 sm:gap-4 sm:px-4">
+          <button
+            type="button"
+            onClick={handleThemeToggle}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-emerald-700/30 bg-emerald-100/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-900 transition hover:bg-emerald-200/70"
+            aria-label="Toggle theme"
+          >
+            {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            {theme === 'light' ? 'Dark' : 'Light'}
+          </button>
+          {navSections.map((section) => (
+            <a
+              key={section.id}
+              href={`#${section.id}`}
+              className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:bg-white/70 hover:text-emerald-800"
+            >
+              {section.label}
+            </a>
+          ))}
+        </nav>
+
       <motion.section
+        id="overview"
         initial="hidden"
         animate="visible"
         variants={animationVariant}
@@ -91,6 +232,7 @@ export default function HomePage() {
       </motion.section>
 
       <motion.section
+        id="links"
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.2 }}
@@ -152,6 +294,7 @@ export default function HomePage() {
       </motion.section>
 
       <motion.section
+        id="skills"
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.2 }}
@@ -176,6 +319,7 @@ export default function HomePage() {
       </motion.section>
 
       <motion.section
+        id="jobs"
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.2 }}
@@ -231,6 +375,7 @@ export default function HomePage() {
       </motion.section>
 
       <motion.section
+        id="summary"
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.2 }}
@@ -294,6 +439,7 @@ export default function HomePage() {
       </motion.section>
 
       <motion.section
+        id="learning"
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.2 }}
@@ -350,7 +496,8 @@ export default function HomePage() {
           ))}
         </div>
       </motion.section>
-    </main>
+      </main>
+    </>
   );
 }
 

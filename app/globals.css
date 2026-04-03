@@ -13,6 +13,17 @@
   --highlight: #fbbf24;
 }
 
+html[data-theme='dark'] {
+  --bg: #0b1623;
+  --surface: #0f2030;
+  --ink: #e3ecf8;
+  --muted: #a2b3c8;
+  --accent: #6ee7b7;
+  --accent-strong: #34d399;
+  --line: #30445b;
+  --highlight: #93c5fd;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -26,6 +37,18 @@ body {
     radial-gradient(circle at 10% 10%, rgba(4, 108, 78, 0.14), transparent 42%),
     radial-gradient(circle at 90% 20%, rgba(251, 191, 36, 0.12), transparent 38%),
     linear-gradient(160deg, #faf6ef 0%, #f3efe5 45%, #eef5ef 100%);
+  transition: background 360ms ease, color 260ms ease;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html[data-theme='dark'] body {
+  background:
+    radial-gradient(circle at 14% 9%, rgba(52, 211, 153, 0.2), transparent 40%),
+    radial-gradient(circle at 86% 12%, rgba(147, 197, 253, 0.18), transparent 42%),
+    linear-gradient(165deg, #030712 0%, #0b1726 45%, #13263a 100%);
 }
 
 h1,
@@ -41,6 +64,11 @@ h4 {
   border: 1px solid color-mix(in srgb, var(--line) 80%, white 20%);
   box-shadow: 0 16px 35px rgba(17, 24, 39, 0.08);
   backdrop-filter: blur(8px);
+  transition: background 260ms ease, border-color 260ms ease, box-shadow 260ms ease;
+}
+
+html[data-theme='dark'] .glass-panel {
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
 }
 
 .heading-gradient {
@@ -53,6 +81,43 @@ h4 {
 .chip {
   border: 1px solid rgba(2, 85, 61, 0.25);
   background: rgba(2, 85, 61, 0.07);
+}
+
+html[data-theme='dark'] .chip {
+  border-color: rgba(110, 231, 183, 0.38);
+  background: rgba(52, 211, 153, 0.14);
+}
+
+html[data-theme='dark'] .text-slate-900,
+html[data-theme='dark'] .text-slate-800,
+html[data-theme='dark'] .text-slate-700,
+html[data-theme='dark'] .text-slate-600,
+html[data-theme='dark'] .text-slate-500 {
+  color: #dbe8f7 !important;
+}
+
+html[data-theme='dark'] .text-emerald-900,
+html[data-theme='dark'] .text-emerald-800,
+html[data-theme='dark'] .text-emerald-700 {
+  color: #9ef1cf !important;
+}
+
+html[data-theme='dark'] .bg-white,
+html[data-theme='dark'] .bg-white\/80,
+html[data-theme='dark'] .bg-white\/90,
+html[data-theme='dark'] .bg-emerald-50,
+html[data-theme='dark'] .bg-orange-50,
+html[data-theme='dark'] .bg-slate-50 {
+  background-color: rgba(15, 32, 48, 0.86) !important;
+}
+
+html[data-theme='dark'] .border-slate-100,
+html[data-theme='dark'] .border-slate-200,
+html[data-theme='dark'] .border-emerald-100,
+html[data-theme='dark'] .border-emerald-200,
+html[data-theme='dark'] .border-orange-100,
+html[data-theme='dark'] .border-orange-200 {
+  border-color: rgba(148, 163, 184, 0.3) !important;
 }
 
 .fade-up {
