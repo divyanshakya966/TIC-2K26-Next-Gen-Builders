@@ -21,6 +21,7 @@ import {
   Radar,
   RadarChart,
   ResponsiveContainer,
+  Tooltip,
 } from 'recharts';
 import { mockUserProfile } from '@/lib/mockData';
 import { cn } from '@/lib/utils';
@@ -57,7 +58,15 @@ const navSections = [
 ];
 
 export default function HomePage() {
-  const [links, setLinks] = useState<SocialLinks>(mockUserProfile.links);
+  const [links, setLinks] = useState<SocialLinks>({
+    github: '',
+    linkedin: '',
+    resume: '',
+    portfolio: '',
+    twitter: '',
+    devto: '',
+  });
+  const [linkErrors, setLinkErrors] = useState<Partial<Record<keyof SocialLinks, string>>>({});
   const [expandedJobs, setExpandedJobs] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [themeTransition, setThemeTransition] = useState<ThemeTransition>(null);
@@ -78,8 +87,27 @@ export default function HomePage() {
     return Math.round(total / mockUserProfile.softSkills.length);
   }, []);
 
+  const isUrlValid = (value: string) => {
+    if (!value) return true;
+    try {
+      new URL(value);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const updateLink = (field: keyof SocialLinks, value: string) => {
     setLinks((prev) => ({ ...prev, [field]: value }));
+    if (!isUrlValid(value)) {
+      setLinkErrors((prev) => ({ ...prev, [field]: 'Please enter a valid URL (https://...).'}));
+    } else {
+      setLinkErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
   };
 
   useEffect(() => {
@@ -287,7 +315,7 @@ export default function HomePage() {
           <button
             type="button"
             onClick={handleThemeToggle}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-emerald-700/30 bg-emerald-100/60 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-900 transition hover:bg-emerald-200/70"
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl btn-accent px-3 py-2 text-xs font-semibold uppercase tracking-wide"
             aria-label="Toggle theme"
           >
             {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
@@ -335,7 +363,7 @@ export default function HomePage() {
           </h2>
           <button
             type="button"
-            className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+            className="rounded-xl btn-accent px-4 py-2 text-sm font-semibold"
           >
             Analyze Profile
           </button>
@@ -346,36 +374,42 @@ export default function HomePage() {
             label="GitHub"
             value={links.github}
             onChange={(value) => updateLink('github', value)}
+            error={linkErrors.github}
             icon={<Github className="h-4 w-4" />}
           />
           <LinkInput
             label="LinkedIn"
             value={links.linkedin}
             onChange={(value) => updateLink('linkedin', value)}
+            error={linkErrors.linkedin}
             icon={<Linkedin className="h-4 w-4" />}
           />
           <LinkInput
             label="Resume"
             value={links.resume}
             onChange={(value) => updateLink('resume', value)}
+            error={linkErrors.resume}
             icon={<BookOpen className="h-4 w-4" />}
           />
           <LinkInput
             label="Portfolio"
-            value={links.portfolio ?? ''}
+            value={links.portfolio}
             onChange={(value) => updateLink('portfolio', value)}
+            error={linkErrors.portfolio}
             icon={<ExternalLink className="h-4 w-4" />}
           />
           <LinkInput
             label="Twitter"
-            value={links.twitter ?? ''}
+            value={links.twitter}
             onChange={(value) => updateLink('twitter', value)}
+            error={linkErrors.twitter}
             icon={<ExternalLink className="h-4 w-4" />}
           />
           <LinkInput
             label="Dev.to"
-            value={links.devto ?? ''}
+            value={links.devto}
             onChange={(value) => updateLink('devto', value)}
+            error={linkErrors.devto}
             icon={<ExternalLink className="h-4 w-4" />}
           />
         </div>
@@ -394,15 +428,15 @@ export default function HomePage() {
           title="Technical Skill Spider Graph"
           subtitle={`Average score ${averageTechnical}%`}
           data={mockUserProfile.technicalSkills}
-          stroke="#02553d"
-          fill="#047857"
+          stroke="var(--accent)"
+          fill="var(--accent)"
         />
         <RadarPanel
           title="Experience & Soft Skills Spider Graph"
           subtitle={`Average score ${averageSoft}%`}
           data={mockUserProfile.softSkills}
-          stroke="#9a3412"
-          fill="#ea580c"
+          stroke="var(--highlight)"
+          fill="var(--highlight)"
         />
       </motion.section>
 
@@ -423,7 +457,7 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => setExpandedJobs((prev) => !prev)}
-            className="rounded-xl border border-emerald-700 px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
+            className="rounded-xl btn-accent px-4 py-2 text-sm font-semibold"
           >
             {expandedJobs ? 'Show Top 3' : 'Expand to Top 5'}
           </button>
@@ -610,9 +644,25 @@ function RadarPanel({
       <div className="h-72 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <RadarChart data={data} outerRadius="72%">
-            <PolarGrid stroke="#bed3bf" />
-            <PolarAngleAxis dataKey="skill" tick={{ fill: '#334155', fontSize: 12 }} />
-            <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+            <PolarGrid stroke="var(--grid)" />
+            <PolarAngleAxis dataKey="skill" tick={{ fill: 'var(--text-primary)', fontSize: 12 }} />
+            <PolarRadiusAxis
+              angle={30}
+              domain={[0, 100]}
+              tick={false}
+              axisLine={false}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'var(--card)',
+                borderColor: 'var(--line)',
+                color: 'var(--text-primary)',
+                boxShadow: '0 8px 22px rgba(0,0,0,0.25)',
+                borderRadius: '0.65rem',
+              }}
+              labelStyle={{ color: 'var(--text-secondary)', fontWeight: 600 }}
+              itemStyle={{ color: 'var(--text-primary)' }}
+            />
             <Radar dataKey="value" stroke={stroke} fill={fill} fillOpacity={0.45} />
           </RadarChart>
         </ResponsiveContainer>
@@ -626,17 +676,19 @@ function LinkInput({
   value,
   onChange,
   icon,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   icon: React.ReactNode;
+  error?: string;
 }) {
   return (
     <label className="space-y-1.5">
-      <span className="text-sm font-semibold text-slate-700">{label}</span>
+      <span className="text-sm font-semibold text-slate-700 dark:text-slate-100">{label}</span>
       <span className="relative block">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400">
           {icon}
         </span>
         <input
@@ -644,9 +696,15 @@ function LinkInput({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={`Enter ${label} URL`}
-          className="w-full rounded-xl border border-slate-300 bg-white px-10 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+          style={{
+            backgroundColor: 'var(--input-bg)',
+            borderColor: value ? 'var(--accent)' : 'var(--line)',
+            color: 'var(--text-primary)',
+          }}
+          className="w-full rounded-xl border px-10 py-2.5 text-sm outline-none transition placeholder:text-slate-500 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30"
         />
       </span>
+      {error ? <p className="mt-1 text-xs font-medium text-rose-300">{error}</p> : null}
     </label>
   );
 }
