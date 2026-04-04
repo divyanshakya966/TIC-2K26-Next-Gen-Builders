@@ -7,7 +7,6 @@ export type ThemeMode = 'light' | 'dark';
 export interface DashboardPreferences {
   theme?: ThemeMode;
   links?: Partial<SocialLinks>;
-  expandedJobs?: boolean;
 }
 
 export interface AnalysisSessionData {

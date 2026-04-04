@@ -12,14 +12,6 @@ function sanitizeTheme(input: unknown): ThemeMode | undefined {
   return undefined;
 }
 
-function sanitizeExpandedJobs(input: unknown): boolean | undefined {
-  if (typeof input === 'boolean') {
-    return input;
-  }
-
-  return undefined;
-}
-
 function sanitizeLinkValue(input: string): string | undefined {
   const trimmed = input.trim();
   if (!trimmed) {
@@ -65,7 +57,6 @@ export async function GET() {
   return NextResponse.json({
     theme: session.preferences?.theme,
     links: session.preferences?.links ?? {},
-    expandedJobs: session.preferences?.expandedJobs,
   });
 }
 
@@ -80,14 +71,12 @@ export async function POST(request: Request) {
 
   const payload = (body ?? {}) as Record<string, unknown>;
   const theme = sanitizeTheme(payload.theme);
-  const expandedJobs = sanitizeExpandedJobs(payload.expandedJobs);
   const links = sanitizeLinks(payload.links);
 
   const hasLinks = Object.keys(links).length > 0;
   const hasTheme = typeof theme !== 'undefined';
-  const hasExpandedJobs = typeof expandedJobs !== 'undefined';
 
-  if (!hasTheme && !hasLinks && !hasExpandedJobs) {
+  if (!hasTheme && !hasLinks) {
     return NextResponse.json(
       { error: 'No valid preference values provided in payload.' },
       { status: 400 },
@@ -100,7 +89,6 @@ export async function POST(request: Request) {
   session.preferences = {
     ...previousPreferences,
     ...(hasTheme ? { theme } : {}),
-    ...(hasExpandedJobs ? { expandedJobs } : {}),
     ...(hasLinks ? { links: { ...previousPreferences.links, ...links } } : {}),
   };
 

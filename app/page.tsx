@@ -79,7 +79,6 @@ export default function HomePage() {
     devto: '',
   });
   const [linkErrors, setLinkErrors] = useState<Partial<Record<keyof SocialLinks, string>>>({});
-  const [expandedJobs, setExpandedJobs] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>('light');
   const [themeTransition, setThemeTransition] = useState<ThemeTransition>(null);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
@@ -106,11 +105,6 @@ export default function HomePage() {
   const [atsAvailable, setAtsAvailable] = useState(false);
   const [industryInsights, setIndustryInsights] = useState(initialProfile.aiSummary.industryInsights);
   const [topSkills, setTopSkills] = useState(initialProfile.aiSummary.topSkills);
-
-  const jobsToShow = useMemo(
-    () => jobs.slice(0, expandedJobs ? 5 : 3),
-    [expandedJobs, jobs],
-  );
 
   const technicalSkillsData = useMemo(() => aiTechnicalSkills.slice(0, 6), [aiTechnicalSkills]);
 
@@ -407,7 +401,6 @@ export default function HomePage() {
         const payload = (await response.json()) as {
           theme?: ThemeMode;
           links?: Partial<SocialLinks>;
-          expandedJobs?: boolean;
         };
 
         if (ignore) {
@@ -416,10 +409,6 @@ export default function HomePage() {
 
         if (payload.theme === 'dark' || payload.theme === 'light') {
           setTheme(payload.theme);
-        }
-
-        if (typeof payload.expandedJobs === 'boolean') {
-          setExpandedJobs(payload.expandedJobs);
         }
 
         if (payload.links && Object.values(payload.links).some((link) => link.trim())) {
@@ -502,7 +491,6 @@ export default function HomePage() {
         body: JSON.stringify({
           theme,
           links,
-          expandedJobs,
         }),
         signal: requestController.signal,
       }).catch((error: unknown) => {
@@ -519,7 +507,7 @@ export default function HomePage() {
       window.clearTimeout(saveTimer);
       requestController.abort();
     };
-  }, [theme, links, expandedJobs, preferencesLoaded]);
+  }, [theme, links, preferencesLoaded]);
 
   const handleThemeToggle = () => {
     if (theme === 'dark') {
@@ -845,55 +833,76 @@ export default function HomePage() {
         transition={{ duration: 0.45, delay: 0.1 }}
         className="glass-panel rounded-3xl p-6 sm:p-8"
       >
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="mb-6">
           <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-900">
             <Briefcase className="h-6 w-6 text-emerald-700" />
-            Job Recommendation System
+            Job & Internship Opportunities
           </h2>
-          <button
-            type="button"
-            onClick={() => setExpandedJobs((prev) => !prev)}
-            className="rounded-xl btn-accent px-4 py-2 text-sm font-semibold"
-          >
-            {expandedJobs ? 'Show Top 3' : 'Expand to Top 5'}
-          </button>
+          <p className="text-sm text-slate-600 mt-1">
+            {jobs.length} opportunities found • Scroll to explore all recommendations
+          </p>
         </div>
 
-        <div className="grid gap-4">
-          {jobsToShow.map((job) => (
-            <article key={job.id} className="rounded-2xl border border-emerald-100 bg-white/80 p-5 shadow-sm">
-              <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">{job.title}</h3>
-                  <p className="text-sm text-slate-600">
-                    {job.company} · {job.location}
-                  </p>
+        <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-200 scrollbar-track-transparent">
+          <div className="grid gap-4 pr-2">
+            {jobs.map((job) => (
+              <article key={job.id} className="rounded-2xl border border-emerald-100 bg-white/80 p-5 shadow-sm hover:shadow-md transition-shadow">
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-slate-900 truncate">{job.title}</h3>
+                    <p className="text-sm text-slate-600 truncate">
+                      {job.company} · {job.location}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 whitespace-nowrap">
+                      {job.matchPercentage}% match
+                    </span>
+                    <span className={`rounded-full px-2 py-1 text-xs font-medium whitespace-nowrap ${
+                      job.type.includes('Paid') ? 'bg-green-100 text-green-800' :
+                      job.type.includes('Unpaid') ? 'bg-blue-100 text-blue-800' :
+                      job.type === 'Contract' ? 'bg-purple-100 text-purple-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {job.type}
+                    </span>
+                  </div>
                 </div>
-                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
-                  {job.matchPercentage}% match
-                </span>
-              </div>
-              <p className="mb-2 text-sm text-slate-700">{job.description}</p>
-              {job.fitReason && (
-                <p className="mb-3 text-xs font-medium text-emerald-800">
-                  Why this fits: {job.fitReason}
-                </p>
-              )}
-              <div className="mb-3 flex flex-wrap gap-2">
-                {job.skills.map((skill) => (
-                  <span
-                    key={`${job.id}-${skill}`}
-                    className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
-              <p className="text-sm font-medium text-slate-800">
-                {job.type} · {job.salary}
-              </p>
-            </article>
-          ))}
+                <p className="mb-3 text-sm text-slate-700 line-clamp-2">{job.description}</p>
+                {job.fitReason && (
+                  <p className="mb-3 text-xs font-medium text-emerald-800">
+                    💡 {job.fitReason}
+                  </p>
+                )}
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {job.skills.slice(0, 3).map((skill) => (
+                    <span
+                      key={`${job.id}-${skill}`}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-slate-800">
+                    💰 {job.salary}
+                  </p>
+                  {job.applyUrl && job.applyUrl !== '#' && (
+                    <a
+                      href={job.applyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 hover:scale-105"
+                    >
+                      Apply Now
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
         </div>
       </motion.section>
 
