@@ -2,9 +2,9 @@ export interface SocialLinks {
   github: string;
   linkedin: string;
   resume: string;
-  twitter?: string;
-  portfolio?: string;
-  devto?: string;
+  twitter: string;
+  portfolio: string;
+  devto: string;
 }
 
 export interface SkillData {

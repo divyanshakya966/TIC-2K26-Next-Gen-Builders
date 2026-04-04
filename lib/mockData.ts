@@ -7,6 +7,7 @@ export const mockUserProfile: UserProfile = {
     resume: 'https://alexdev.io/resume.pdf',
     twitter: 'https://twitter.com/alexdev',
     portfolio: 'https://alexdev.io',
+    devto: '',
   },
   technicalSkills: [
     { skill: 'JavaScript', value: 85, fullMark: 100 },
