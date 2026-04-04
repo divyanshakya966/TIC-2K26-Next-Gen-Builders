@@ -30,5 +30,7 @@ const sessionOptions: SessionOptions = {
 };
 
 export async function getDashboardSession() {
-  return getIronSession<DashboardSessionData>(cookies(), sessionOptions);
+  // Next.js 16 cookies() may be async; cast to any because iron-session expects CookieStore
+  const cookieStore = (await cookies()) as unknown as any;
+  return getIronSession<DashboardSessionData>(cookieStore, sessionOptions);
 }
