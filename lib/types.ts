@@ -32,6 +32,8 @@ export interface AISummary {
   strengths: string[];
   gaps: string[];
   industryRelevanceScore: number;
+  atsScore: number;
+  atsFeedback: string[];
   industryInsights: string;
   topSkills: string[];
 }

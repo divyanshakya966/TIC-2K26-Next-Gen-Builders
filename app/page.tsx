@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios'
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -13,6 +13,7 @@ import {
   Moon,
   Sparkles,
   Sun,
+  Upload,
   UserCircle2,
 } from 'lucide-react';
 import {
@@ -66,6 +67,7 @@ const navSections = [
 
 export default function HomePage() {
   const initialProfile = createEmptyUserProfile();
+  const resumeFileInputRef = useRef<HTMLInputElement | null>(null);
   const [links, setLinks] = useState<SocialLinks>({
     github: '',
     linkedin: '',
@@ -88,10 +90,15 @@ export default function HomePage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisMessage, setAnalysisMessage] = useState<string | null>(null);
+  const [resumeText, setResumeText] = useState('');
+  const [resumeFileName, setResumeFileName] = useState('');
+  const [uploadingResume, setUploadingResume] = useState(false);
 
   const [jobs, setJobs] = useState<JobRecommendation[]>(initialProfile.jobRecommendations);
   const [learningPath, setLearningPath] = useState<LearningPathItem[]>(initialProfile.learningPath);
   const [industryRelevanceScore, setIndustryRelevanceScore] = useState(initialProfile.aiSummary.industryRelevanceScore);
+  const [atsScore, setAtsScore] = useState(initialProfile.aiSummary.atsScore);
+  const [atsFeedback, setAtsFeedback] = useState(initialProfile.aiSummary.atsFeedback);
   const [industryInsights, setIndustryInsights] = useState(initialProfile.aiSummary.industryInsights);
   const [topSkills, setTopSkills] = useState(initialProfile.aiSummary.topSkills);
 
@@ -136,6 +143,8 @@ export default function HomePage() {
     setJobs(initialProfile.jobRecommendations);
     setLearningPath(initialProfile.learningPath);
     setIndustryRelevanceScore(initialProfile.aiSummary.industryRelevanceScore);
+    setAtsScore(initialProfile.aiSummary.atsScore);
+    setAtsFeedback(initialProfile.aiSummary.atsFeedback);
     setIndustryInsights(initialProfile.aiSummary.industryInsights);
     setTopSkills(initialProfile.aiSummary.topSkills);
     setAnalysisMessage('Edit completed links, then click Analyze Profile to refresh recommendations for the new user.');
@@ -149,14 +158,56 @@ export default function HomePage() {
       });
     }
   };
+
+  const handleResumeUpload = async (file: File) => {
+    setUploadingResume(true);
+    setAnalysisError(null);
+    setAnalysisMessage('Importing resume and extracting text...');
+
+    try {
+      const formData = new FormData();
+      formData.append('resume', file);
+
+      const response = await axios.post('/api/resume/import', formData);
+
+      const parsedResumeText = typeof response.data?.resumeText === 'string' ? response.data.resumeText : '';
+      const parsedFileName = typeof response.data?.fileName === 'string' ? response.data.fileName : file.name;
+      const detectedSkills = Array.isArray(response.data?.detectedSkills) ? response.data.detectedSkills : [];
+
+      setResumeText(parsedResumeText);
+      setResumeFileName(parsedFileName);
+      setAnalysisMessage(
+        `Resume imported (${parsedFileName}). Detected ${detectedSkills.length} keyword signals. Click Analyze Profile to include ATS scoring.`,
+      );
+    } catch (error: any) {
+      const responseData = error?.response?.data;
+      const stringPayload = typeof responseData === 'string' ? responseData.trim() : '';
+      const looksLikeHtml = /^<!doctype html>|^<html[\s>]/i.test(stringPayload);
+      const apiError = typeof responseData?.error === 'string'
+        ? responseData.error
+        : looksLikeHtml
+          ? 'Resume upload failed due to a server parsing error. Please try a .pdf, .docx, or .txt file.'
+          : stringPayload.length > 0
+            ? stringPayload
+          : 'Failed to import resume. Please upload PDF, DOCX, or TXT.';
+      setAnalysisError(apiError);
+      setAnalysisMessage(null);
+    } finally {
+      setUploadingResume(false);
+    }
+  };
+
   const handleAnalyzeProfile = async () => {
-    if (!Object.values(links).some((link) => link.trim())) {
-      setAnalysisError('Please provide at least one link.');
+    const hasLinks = Object.values(links).some((link) => link.trim());
+    const hasResumeUpload = resumeText.trim().length > 0;
+
+    if (!hasLinks && !hasResumeUpload) {
+      setAnalysisError('Please provide at least one link or upload a resume.');
       setAnalysisMessage(null);
       return;
     }
 
-    const invalidField = Object.entries(links).find(([, value]) => value && !isUrlValid(value));
+    const invalidField = Object.entries(links).find(([, value]) => value.trim() && !isUrlValid(value));
     if (invalidField) {
       setAnalysisError(`Please enter a valid URL for ${invalidField[0]}.`);
       setAnalysisMessage(null);
@@ -169,7 +220,11 @@ export default function HomePage() {
     setExtractedSkills([]);
 
     try {
-      const response = await axios.post('/api/analyze-profile', { links });
+      const response = await axios.post('/api/analyze-profile', {
+        links,
+        resumeText,
+        resumeFileName,
+      });
       const skills = response.data.skills || [];
       const aiTech = (response.data.aiTechnicalSkills || []).map((s: any) => ({
         skill: s.name,
@@ -190,6 +245,8 @@ export default function HomePage() {
       setAiSoftSkills(aiSoft);
 
       setIndustryRelevanceScore(response.data.aiIndustryRelevanceScore ?? 0);
+      setAtsScore(response.data.aiAtsScore ?? 0);
+      setAtsFeedback(response.data.aiAtsFeedback || []);
       setIndustryInsights(response.data.aiIndustryInsights || '');
       setTopSkills(response.data.aiTopSkills || []);
       setJobs(response.data.aiJobRecommendations || []);
@@ -205,6 +262,8 @@ export default function HomePage() {
           strengths: response.data.aiStrengths || [],
           gaps: response.data.aiGaps || [],
           industryRelevanceScore: response.data.aiIndustryRelevanceScore ?? 0,
+          atsScore: response.data.aiAtsScore ?? 0,
+          atsFeedback: response.data.aiAtsFeedback || [],
           industryInsights: response.data.aiIndustryInsights || '',
           topSkills: response.data.aiTopSkills || [],
         },
@@ -300,6 +359,8 @@ export default function HomePage() {
               setAiTechnicalSkills(savedProfile.technicalSkills);
               setAiSoftSkills(savedProfile.softSkills);
               setIndustryRelevanceScore(savedProfile.aiSummary.industryRelevanceScore);
+              setAtsScore(savedProfile.aiSummary.atsScore ?? 0);
+              setAtsFeedback(savedProfile.aiSummary.atsFeedback ?? []);
               setIndustryInsights(savedProfile.aiSummary.industryInsights);
               setTopSkills(savedProfile.aiSummary.topSkills);
               setJobs(savedProfile.jobRecommendations);
@@ -566,6 +627,32 @@ export default function HomePage() {
             onChange={(value) => updateLink('resume', value)}
             error={linkErrors.resume}
             icon={<BookOpen className="h-4 w-4" />}
+            leftAction={(
+              <>
+                <button
+                  type="button"
+                  onClick={() => resumeFileInputRef.current?.click()}
+                  disabled={uploadingResume}
+                  className="inline-flex h-full items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  {uploadingResume ? 'Importing...' : 'Import Resume'}
+                </button>
+                <input
+                  ref={resumeFileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      void handleResumeUpload(file);
+                    }
+                    event.currentTarget.value = '';
+                  }}
+                />
+              </>
+            )}
           />
           <LinkInput
             label="Portfolio"
@@ -589,6 +676,11 @@ export default function HomePage() {
             icon={<ExternalLink className="h-4 w-4" />}
           />
         </div>
+        {resumeFileName && (
+          <p className="mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+            Imported resume: {resumeFileName}
+          </p>
+        )}
          {/* Error Display */}
         {analysisError && <p className="text-red-500 mt-4">{analysisError}</p>}
         {!analysisError && analysisMessage && (
@@ -753,6 +845,25 @@ export default function HomePage() {
               />
             </div>
           </div>
+            <div className="mt-4 rounded-2xl border border-sky-200 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Resume ATS Score</p>
+              <p className="mt-1 text-3xl font-bold text-sky-800">{atsScore}%</p>
+              <div className="mt-2 h-3 overflow-hidden rounded-full bg-sky-100">
+                <div
+                  className="h-full rounded-full bg-sky-600"
+                  style={{ width: `${atsScore}%` }}
+                />
+              </div>
+              {atsFeedback.length > 0 && (
+                <ul className="mt-3 space-y-1.5 text-xs text-slate-700">
+                  {atsFeedback.slice(0, 3).map((item) => (
+                    <li key={item} className="rounded-lg bg-sky-50 px-2.5 py-1.5">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           <p className="mt-4 text-sm leading-6 text-slate-700">{industryInsights}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {topSkills.map((skill) => (
@@ -889,40 +1000,49 @@ function LinkInput({
   onChange,
   icon,
   error,
+  leftAction,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   icon: React.ReactNode;
   error?: string;
+  leftAction?: React.ReactNode;
 }) {
   return (
-    <label className="space-y-1.5">
+    <div className="space-y-1.5">
       <span className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
         {label}
       </span>
-      <span className="relative block">
-        <span
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          {icon}
+      <div className="flex items-stretch gap-2">
+        {leftAction ? (
+          <span className="shrink-0">
+            {leftAction}
+          </span>
+        ) : null}
+        <span className="relative block flex-1">
+          <span
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {icon}
+          </span>
+          <input
+            type="url"
+            autoComplete="off"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder={`Enter ${label} URL`}
+            style={{
+              backgroundColor: 'var(--input-bg)',
+              borderColor: value ? 'var(--accent)' : 'var(--line)',
+              color: 'var(--text-primary)',
+            }}
+            className="w-full rounded-xl border px-10 py-2.5 text-sm outline-none transition placeholder:text-[color:var(--text-muted)] focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30"
+          />
         </span>
-        <input
-          type="url"
-          autoComplete="off"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={`Enter ${label} URL`}
-          style={{
-            backgroundColor: 'var(--input-bg)',
-            borderColor: value ? 'var(--accent)' : 'var(--line)',
-            color: 'var(--text-primary)',
-          }}
-          className="w-full rounded-xl border px-10 py-2.5 text-sm outline-none transition placeholder:text-[color:var(--text-muted)] focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30"
-        />
-      </span>
+      </div>
       {error ? <p className="mt-1 text-xs font-medium text-rose-300">{error}</p> : null}
-    </label>
+    </div>
   );
 }

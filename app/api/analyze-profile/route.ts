@@ -13,6 +13,12 @@ interface SocialLinks {
   devto?: string;
 }
 
+interface AnalyzeProfileRequestBody {
+  links?: SocialLinks;
+  resumeText?: string;
+  resumeFileName?: string;
+}
+
 interface Skill {
   name: string;
   confidence: number;
@@ -139,6 +145,7 @@ function extractSkillsFromText(text: string, source: string): Skill[] {
     'Portfolio': 0.75,
     'Dev.to': 0.65,
     'Resume': 0.70,
+    'Resume Upload': 0.84,
     'Twitter': 0.55,
   };
 
@@ -172,6 +179,7 @@ function aggregateSkillsByNameWithBoost(skills: Skill[]): Skill[] {
     'Portfolio': 0.90,
     'Dev.to': 0.80,
     'Resume': 0.88,
+    'Resume Upload': 0.95,
     'Twitter': 0.60,
   };
 
@@ -350,6 +358,19 @@ function buildProfileText(links: SocialLinks, sources: ScrapedSource[], extracte
   }
 
   return lines.length > 0 ? truncateText(lines.join('\n\n'), 12000) : 'No profile links or detected skills available';
+}
+
+function buildUploadedResumeSource(resumeText: string, resumeFileName?: string): ScrapedSource {
+  const cleanedResumeText = truncateText(resumeText, 6000);
+
+  return {
+    source: 'Resume Upload',
+    url: resumeFileName ? `uploaded://${resumeFileName}` : 'uploaded://resume',
+    title: resumeFileName || 'Uploaded Resume',
+    description: 'Resume text imported from local upload.',
+    text: cleanedResumeText,
+    skills: extractSkillsFromText(cleanedResumeText, 'Resume Upload'),
+  };
 }
 
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string }> {
@@ -1050,6 +1071,37 @@ function enrichAnalysis(analysis: AnalysisResult, extractedSkills: Skill[]): Ana
 
   const strengths = buildPersonalizedStrengths({ ...analysis, technicalSkills, softSkills, topSkills }, sources, focusArea);
 
+  const hasResumeEvidence = extractedSkills.some((skill) => normalizeToken(skill.source).includes('resume'));
+  const technicalAverage = technicalSkills.length > 0
+    ? technicalSkills.reduce((sum, skill) => sum + skill.score, 0) / technicalSkills.length
+    : 0;
+  const softAverage = softSkills.length > 0
+    ? softSkills.reduce((sum, skill) => sum + skill.score, 0) / softSkills.length
+    : 0;
+
+  const keywordCoverageComponent = Math.min(35, topSkills.length * 5 + technicalSkills.length * 2);
+  const skillSignalComponent = (technicalAverage * 0.35) + (softAverage * 0.15);
+  const resumeEvidenceComponent = hasResumeEvidence ? 16 : 6;
+  const gapPenalty = Math.min(16, gaps.length * 3);
+
+  const fallbackAtsScore = Math.max(
+    38,
+    Math.min(
+      98,
+      Math.round(keywordCoverageComponent + skillSignalComponent + resumeEvidenceComponent - gapPenalty),
+    ),
+  );
+
+  const atsScore = analysis.atsScore > 0 ? analysis.atsScore : fallbackAtsScore;
+  const atsFeedback = analysis.atsFeedback.length > 0
+    ? analysis.atsFeedback
+    : [
+        'Mirror keywords from target job descriptions in your skills and project bullets.',
+        'Add measurable impact lines (for example: reduced latency by 25%, built for 10k users).',
+        'Keep section headings standard: Summary, Skills, Experience, Projects, Education.',
+        'Use a clean one-column format to improve ATS parsing reliability.',
+      ];
+
   return {
     ...analysis,
     technicalSkills,
@@ -1058,6 +1110,8 @@ function enrichAnalysis(analysis: AnalysisResult, extractedSkills: Skill[]): Ana
     gaps,
     recommendations,
     industryRelevanceScore,
+    atsScore,
+    atsFeedback,
     industryInsights,
     topSkills,
     strengths,
@@ -1662,35 +1716,44 @@ function buildAILearningPath(
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json()) as { links?: SocialLinks };
+    const body = (await request.json()) as AnalyzeProfileRequestBody;
     const links = body?.links ?? {};
+    const uploadedResumeText = typeof body?.resumeText === 'string' ? body.resumeText.trim() : '';
+    const uploadedResumeFileName = typeof body?.resumeFileName === 'string' ? body.resumeFileName.trim() : '';
+    const hasResumeUpload = uploadedResumeText.length > 0;
+    const hasAnyProfileLinks = buildUrlList(links).length > 0;
 
-    if (buildUrlList(links).length === 0) {
-      return NextResponse.json({ error: 'Please provide at least one public profile link.' }, { status: 400 });
+    if (!hasAnyProfileLinks && !hasResumeUpload) {
+      return NextResponse.json({ error: 'Please provide at least one public profile link or upload a resume.' }, { status: 400 });
     }
 
-    // Verify link accessibility before scraping
-    const linkVerification = await verifyLinks(links);
+    if (hasAnyProfileLinks) {
+      // Verify link accessibility before scraping
+      const linkVerification = await verifyLinks(links);
 
-    if (linkVerification.accessibleCount === 0) {
-      return NextResponse.json(
-        {
-          error: 'None of the provided links are accessible.',
-          details: linkVerification.inaccessibleLinks.map((link) => ({
-            source: link.source,
-            url: link.url,
-            reason: link.error,
-          })),
-        },
-        { status: 400 },
-      );
+      if (linkVerification.accessibleCount === 0 && !hasResumeUpload) {
+        return NextResponse.json(
+          {
+            error: 'None of the provided links are accessible.',
+            details: linkVerification.inaccessibleLinks.map((link) => ({
+              source: link.source,
+              url: link.url,
+              reason: link.error,
+            })),
+          },
+          { status: 400 },
+        );
+      }
+
+      if (linkVerification.inaccessibleLinks.length > 0) {
+        console.warn('Some links are inaccessible:', linkVerification.inaccessibleLinks);
+      }
     }
 
-    if (linkVerification.inaccessibleLinks.length > 0) {
-      console.warn('Some links are inaccessible:', linkVerification.inaccessibleLinks);
+    const scrapedSources = hasAnyProfileLinks ? await collectScrapedSources(links) : [];
+    if (hasResumeUpload) {
+      scrapedSources.push(buildUploadedResumeSource(uploadedResumeText, uploadedResumeFileName || undefined));
     }
-
-    const scrapedSources = await collectScrapedSources(links);
     
     // Build raw text for AI analysis
     const allScrapedText = scrapedSources.map((s) => s.text).join(' ');
@@ -1739,6 +1802,8 @@ export async function POST(request: NextRequest) {
         topSkills: [],
         strengths: [],
         industryRelevanceScore: 0,
+        atsScore: 0,
+        atsFeedback: [],
         industryInsights: '',
         jobRecommendations: [],
         learningPath: [],
@@ -1777,6 +1842,8 @@ export async function POST(request: NextRequest) {
       aiTechnicalSkills: processedAnalysis.technicalSkills,
       aiSoftSkills: processedAnalysis.softSkills,
       aiIndustryRelevanceScore: processedAnalysis.industryRelevanceScore,
+      aiAtsScore: processedAnalysis.atsScore,
+      aiAtsFeedback: processedAnalysis.atsFeedback,
       aiIndustryInsights: processedAnalysis.industryInsights,
       aiTopSkills: processedAnalysis.topSkills,
       aiJobRecommendations,

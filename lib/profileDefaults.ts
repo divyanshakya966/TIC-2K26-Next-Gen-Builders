@@ -37,6 +37,8 @@ export function createEmptyUserProfile(links: Partial<SocialLinks> = {}): UserPr
       strengths: [],
       gaps: ['No live profile has been analyzed yet.'],
       industryRelevanceScore: 0,
+      atsScore: 0,
+      atsFeedback: ['Upload a resume and run analysis to receive ATS scoring feedback.'],
       industryInsights: 'Waiting for a public profile link to analyze.',
       topSkills: [],
     },

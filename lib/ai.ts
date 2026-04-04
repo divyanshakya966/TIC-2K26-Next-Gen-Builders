@@ -31,6 +31,8 @@ export interface AIProfileAnalysis {
   recommendations: string[];
   jobRecommendations: AIJobRecommendation[];
   industryRelevanceScore: number;
+  atsScore: number;
+  atsFeedback: string[];
   industryInsights: string;
   topSkills: string[];
   rawText: string;
@@ -305,6 +307,8 @@ export async function analyzeProfileText(rawText: string): Promise<AIProfileAnal
   "summary":"string",
   "gaps":["string"],
   "recommendations":["string"],
+  "atsScore": 0,
+  "atsFeedback": ["string"],
   "jobRecommendations": [
     {
       "title":"string",
@@ -329,6 +333,8 @@ Rules:
 - Include a mix of full-time roles, paid internships, and unpaid internships.
 - Tailor all job recommendations to match the user's actual skills detected in their profile.
 - matchPercentage should reflect how well the job aligns with the user's skills (0-100).
+- atsScore must be between 0 and 100 and estimate resume ATS-readiness (keyword coverage, role alignment, measurable impact statements, and formatting clarity).
+- atsFeedback should contain 3-6 concise, actionable points to improve ATS score.
 - location can be "Remote", "Hybrid", or a specific city.
 - salary should be a realistic range or null for internships.
 
@@ -349,12 +355,16 @@ ${rawText}`;
   let summary = '';
   let gaps: string[] = [];
   let recommendations: string[] = [];
+  let atsScore = 0;
+  let atsFeedback: string[] = [];
   let jobRecommendations: AIJobRecommendation[] = [];
 
   if (parsed) {
     summary = typeof parsed.summary === 'string' ? parsed.summary : '';
     gaps = Array.isArray(parsed.gaps) ? parsed.gaps.slice(0, 6).map(String) : [];
     recommendations = Array.isArray(parsed.recommendations) ? parsed.recommendations.slice(0, 6).map(String) : [];
+    atsScore = Math.min(100, Math.max(0, Number(parsed.atsScore) || 0));
+    atsFeedback = Array.isArray(parsed.atsFeedback) ? parsed.atsFeedback.slice(0, 6).map(String) : [];
     
     if (Array.isArray(parsed.jobRecommendations)) {
       jobRecommendations = parsed.jobRecommendations
@@ -389,6 +399,20 @@ ${rawText}`;
 
   const industryInsights = `Technical average ${Math.round(technicalAvg)}, soft average ${Math.round(softAvg)}. Prioritize upskilling in ${topSkills.slice(0, 3).join(', ')}.`;
 
+  const computedAtsScore = atsScore > 0
+    ? Math.round(atsScore)
+    : Math.round((technicalAvg * 0.55) + (softAvg * 0.2) + (topSkills.length >= 5 ? 15 : topSkills.length * 3));
+
+  const normalizedAtsScore = Math.max(0, Math.min(100, computedAtsScore));
+
+  const normalizedAtsFeedback = atsFeedback.length > 0
+    ? atsFeedback
+    : [
+        'Tailor resume keywords to match target role descriptions.',
+        'Highlight measurable project outcomes (metrics, impact, scale).',
+        'Use clear section headers and consistent role-based skill grouping.',
+      ];
+
   return {
     technicalSkills,
     softSkills,
@@ -398,6 +422,8 @@ ${rawText}`;
     recommendations,
     jobRecommendations,
     industryRelevanceScore,
+    atsScore: normalizedAtsScore,
+    atsFeedback: normalizedAtsFeedback,
     industryInsights,
     topSkills,
     rawText,
